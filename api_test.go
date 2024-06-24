@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	r "reflect"
 	"testing"
 
 	nio "github.com/Matej-Chmel/go-number-io"
@@ -133,7 +134,7 @@ var (
 	}
 )
 
-func check1D[T ite.SliceItem](err error, a, b []T, cmp func(T, T) bool, t *testing.T) {
+func check1D[T SliceItem](err error, a, b []T, cmp func(T, T) bool, t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	} else if !compare1D(a, b, cmp) {
@@ -141,7 +142,7 @@ func check1D[T ite.SliceItem](err error, a, b []T, cmp func(T, T) bool, t *testi
 	}
 }
 
-func check2D[T ite.SliceItem](err error, a, b [][]T, cmp func(T, T) bool, t *testing.T) {
+func check2D[T SliceItem](err error, a, b [][]T, cmp func(T, T) bool, t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	} else if !compare2D(a, b, cmp) {
@@ -149,7 +150,7 @@ func check2D[T ite.SliceItem](err error, a, b [][]T, cmp func(T, T) bool, t *tes
 	}
 }
 
-func check3D[T ite.SliceItem](err error, a, b [][][]T, cmp func(T, T) bool, t *testing.T) {
+func check3D[T SliceItem](err error, a, b [][][]T, cmp func(T, T) bool, t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	} else if !compare3D(a, b, cmp) {
@@ -157,7 +158,7 @@ func check3D[T ite.SliceItem](err error, a, b [][][]T, cmp func(T, T) bool, t *t
 	}
 }
 
-func compare1D[T ite.SliceItem](a1, b1 []T, cmp func(T, T) bool) bool {
+func compare1D[T SliceItem](a1, b1 []T, cmp func(T, T) bool) bool {
 	if len(a1) != len(b1) {
 		return false
 	}
@@ -171,7 +172,7 @@ func compare1D[T ite.SliceItem](a1, b1 []T, cmp func(T, T) bool) bool {
 	return true
 }
 
-func compare2D[T ite.SliceItem](a2, b2 [][]T, cmp func(T, T) bool) bool {
+func compare2D[T SliceItem](a2, b2 [][]T, cmp func(T, T) bool) bool {
 	if len(a2) != len(b2) {
 		return false
 	}
@@ -185,7 +186,7 @@ func compare2D[T ite.SliceItem](a2, b2 [][]T, cmp func(T, T) bool) bool {
 	return true
 }
 
-func compare3D[T ite.SliceItem](a3, b3 [][][]T, cmp func(T, T) bool) bool {
+func compare3D[T SliceItem](a3, b3 [][][]T, cmp func(T, T) bool) bool {
 	if len(a3) != len(b3) {
 		return false
 	}
@@ -204,108 +205,138 @@ func epsilonCompare[T ite.Number](a, b T) bool {
 	return math.Abs(diff) <= epsilon
 }
 
-func equals[T ite.SliceItem](a, b T) bool {
+func equals[T SliceItem](a, b T) bool {
 	return a == b
+}
+
+func getEpsilonCmp[T any]() interface{} {
+	switch kind := ite.GetTypeKind[T](); kind {
+	case r.Float32:
+		return epsilonCompare[float32]
+	case r.Float64:
+		return epsilonCompare[float64]
+	}
+
+	return nil
+}
+
+func getExpected[T SliceItem]() ([]T, [][]T, [][][]T) {
+	var i1D interface{}
+	var i2D interface{}
+	var i3D interface{}
+
+	switch kind := ite.GetTypeKind[T](); kind {
+	case r.Bool:
+		i1D, i2D, i3D = bool1D, bool2D, bool3D
+	case r.Float32:
+		i1D, i2D, i3D = float1D, float2D, float3D
+	case r.Int32:
+		i1D, i2D, i3D = int1D, int2D, int3D
+	case r.Uint32:
+		i1D, i2D, i3D = uint1D, uint2D, uint3D
+	}
+
+	r1D, _ := i1D.([]T)
+	r2D, _ := i2D.([][]T)
+	r3D, _ := i3D.([][][]T)
+	return r1D, r2D, r3D
+}
+
+func getTypeName[T SliceItem]() string {
+	switch kind := ite.GetTypeKind[T](); kind {
+	case r.Bool:
+		return "bool"
+	case r.Float32:
+		return "float"
+	case r.Float64:
+		return "float64"
+	case r.Int8:
+		return "int8"
+	case r.Int16:
+		return "int16"
+	case r.Int32:
+		return "int"
+	case r.Int64:
+		return "int64"
+	case r.Uint8:
+		return "uint8"
+	case r.Uint16:
+		return "uint16"
+	case r.Uint32:
+		return "uint"
+	case r.Uint64:
+		return "uint64"
+	}
+
+	return "unknown"
+}
+
+type file struct {
+	*os.File
+	error
+}
+
+func openFile(dim uint, typeName string) file {
+	filePath := fmt.Sprintf("data/%s/%dD.txt", typeName, dim)
+	data, err := os.Open(filePath)
+	return file{File: data, error: err}
+}
+
+func openFiles[T SliceItem]() (res [3]file) {
+	typeName := getTypeName[T]()
+	res[0] = openFile(1, typeName)
+	res[1] = openFile(2, typeName)
+	res[2] = openFile(3, typeName)
+	return
+}
+
+type SliceItem interface {
+	bool | ite.Number
 }
 
 func throw[T any](a, b T, t *testing.T) {
 	t.Errorf("\n\n%v\n\n!=\n\n%v", a, b)
 }
 
-func startTest(dim uint, typeName string, t *testing.T, f func(*os.File)) {
-	filePath := fmt.Sprintf("data/%s/%dD.txt", typeName, dim)
-	file, err := os.Open(filePath)
+func runTest[T SliceItem](t *testing.T) {
+	e1D, e2D, e3D := getExpected[T]()
+	files := openFiles[T]()
 
-	if err != nil {
-		t.Error(err)
-		return
+	defer func() {
+		for _, v := range files {
+			v.Close()
+		}
+	}()
+
+	var cmp func(T, T) bool = equals[T]
+	eps, ok := getEpsilonCmp[T]().(func(T, T) bool)
+
+	if eps != nil && ok {
+		cmp = eps
 	}
 
-	defer file.Close()
+	a1D, err := nio.Read1D[T](files[0])
+	check1D(err, a1D, e1D, cmp, t)
 
-	f(file)
+	a2D, err := nio.Read2D[T](files[1])
+	check2D(err, a2D, e2D, cmp, t)
+
+	a3D, err := nio.Read3D[T](files[2])
+	check3D(err, a3D, e3D, cmp, t)
 }
 
-func Test1DBool(t *testing.T) {
-	startTest(1, "bool", t, func(file *os.File) {
-		actual, err := nio.Read1D(file, nio.DefaultChunkSize, nio.ConvertBool)
-		check1D(err, actual, bool1D, equals, t)
-	})
+func TestBool(t *testing.T) {
+	runTest[bool](t)
 }
 
-func Test2DBool(t *testing.T) {
-	startTest(2, "bool", t, func(file *os.File) {
-		actual, err := nio.Read2D(file, nio.DefaultChunkSize, nio.ConvertBool)
-		check2D(err, actual, bool2D, equals, t)
-	})
+func TestFloat32(t *testing.T) {
+	runTest[float32](t)
 }
 
-func Test3DBool(t *testing.T) {
-	startTest(3, "bool", t, func(file *os.File) {
-		actual, err := nio.Read3D(file, nio.DefaultChunkSize, nio.ConvertBool)
-		check3D(err, actual, bool3D, equals, t)
-	})
+func TestInt32(t *testing.T) {
+	runTest[int32](t)
 }
 
-func Test1DFloat32(t *testing.T) {
-	startTest(1, "float", t, func(file *os.File) {
-		actual, err := nio.Read1D(file, nio.DefaultChunkSize, nio.ConvertFloat[float32])
-		check1D(err, actual, float1D, epsilonCompare, t)
-	})
-}
-
-func Test2DFloat32(t *testing.T) {
-	startTest(2, "float", t, func(file *os.File) {
-		actual, err := nio.Read2D(file, nio.DefaultChunkSize, nio.ConvertFloat[float32])
-		check2D(err, actual, float2D, epsilonCompare, t)
-	})
-}
-
-func Test3DFloat32(t *testing.T) {
-	startTest(3, "float", t, func(file *os.File) {
-		actual, err := nio.Read3D(file, nio.DefaultChunkSize, nio.ConvertFloat[float32])
-		check3D(err, actual, float3D, epsilonCompare, t)
-	})
-}
-
-func Test1DInt32(t *testing.T) {
-	startTest(1, "int", t, func(file *os.File) {
-		actual, err := nio.Read1D(file, nio.DefaultChunkSize, nio.ConvertSigned[int32])
-		check1D(err, actual, int1D, equals, t)
-	})
-}
-
-func Test2DInt32(t *testing.T) {
-	startTest(2, "int", t, func(file *os.File) {
-		actual, err := nio.Read2D(file, nio.DefaultChunkSize, nio.ConvertSigned[int32])
-		check2D(err, actual, int2D, equals, t)
-	})
-}
-
-func Test3DInt32(t *testing.T) {
-	startTest(3, "int", t, func(file *os.File) {
-		actual, err := nio.Read3D(file, nio.DefaultChunkSize, nio.ConvertSigned[int32])
-		check3D(err, actual, int3D, equals, t)
-	})
-}
-
-func Test1DUint32(t *testing.T) {
-	startTest(1, "uint", t, func(file *os.File) {
-		actual, err := nio.Read1D(file, nio.DefaultChunkSize, nio.ConvertUnsigned[uint32])
-		check1D(err, actual, uint1D, equals, t)
-	})
-}
-
-func Test2DUint32(t *testing.T) {
-	startTest(2, "uint", t, func(file *os.File) {
-		actual, err := nio.Read2D(file, nio.DefaultChunkSize, nio.ConvertUnsigned[uint32])
-		check2D(err, actual, uint2D, equals, t)
-	})
-}
-
-func Test3DUint32(t *testing.T) {
-	startTest(3, "uint", t, func(file *os.File) {
-		actual, err := nio.Read3D(file, nio.DefaultChunkSize, nio.ConvertUnsigned[uint32])
-		check3D(err, actual, uint3D, equals, t)
-	})
+func TestUint32(t *testing.T) {
+	runTest[uint32](t)
 }

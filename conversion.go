@@ -2,6 +2,7 @@ package gonumberio
 
 import (
 	"fmt"
+	r "reflect"
 
 	ite "github.com/Matej-Chmel/go-number-io/internal"
 
@@ -37,52 +38,6 @@ func ConvertByte(r *ByteReader) (byte, uint, error) {
 	return b, ite.HasValue, err
 }
 
-func convertSignedTemplate[T ite.SignedNumber](r *ByteReader,
-	processNonDigit func(uint, uint, T) (uint, error),
-	processDigit func(uint, uint, T) (T, uint),
-) (T, uint, error) {
-	res, flags, err := convertTemplate(r, processNonDigit, processDigit)
-
-	if (flags & ite.IsNegative) == ite.IsNegative {
-		res *= T(-1)
-	}
-
-	return res, flags, err
-}
-
-func convertTemplate[T ite.Number](
-	r *ByteReader,
-	processNonDigit func(uint, uint, T) (uint, error),
-	processDigit func(uint, uint, T) (T, uint),
-) (T, uint, error) {
-	var digit uint = 0
-	var err error = nil
-	var flags uint = 0
-	res := T(0)
-
-	for {
-		digit, err = r.NextDigit()
-
-		if err != nil {
-			break
-		}
-
-		flags, err = processNonDigit(digit, flags, res)
-
-		if err != nil || (flags&ite.Break) == ite.Break {
-			break
-		}
-
-		if digit >= ite.DecimalDot {
-			continue
-		}
-
-		res, flags = processDigit(digit, flags, res)
-	}
-
-	return res, flags, err
-}
-
 func ConvertFloat[T constraints.Float](r *ByteReader) (T, uint, error) {
 	decMult := T(.1)
 	processDigit := func(digit uint, flags uint, res T) (T, uint) {
@@ -96,13 +51,48 @@ func ConvertFloat[T constraints.Float](r *ByteReader) (T, uint, error) {
 		return res, flags | ite.HasValue
 	}
 
-	return convertSignedTemplate(r, ite.ProcessFloatNonDigit, processDigit)
+	return ite.ConvertSignedTemplate(r, ite.ProcessFloatNonDigit, processDigit)
 }
 
 func ConvertSigned[T constraints.Signed](r *ByteReader) (T, uint, error) {
-	return convertSignedTemplate[T](r, ite.ProcessIntNonDigit, ite.ProcessDigit)
+	return ite.ConvertSignedTemplate[T](r, ite.ProcessIntNonDigit, ite.ProcessDigit)
 }
 
 func ConvertUnsigned[T constraints.Unsigned](r *ByteReader) (T, uint, error) {
-	return convertTemplate[T](r, ite.ProcessUintNonDigit, ite.ProcessDigit)
+	return ite.ConvertTemplate[T](r, ite.ProcessUintNonDigit, ite.ProcessDigit)
+}
+
+func GetConversion[T any]() func(r *ByteReader) (T, uint, error) {
+	var ifc interface{}
+
+	switch kind := ite.GetTypeKind[T](); kind {
+	case r.Bool:
+		ifc = ConvertBool
+	case r.Float32:
+		ifc = ConvertFloat[float32]
+	case r.Float64:
+		ifc = ConvertFloat[float64]
+	case r.Int8:
+		ifc = ConvertSigned[int8]
+	case r.Int16:
+		ifc = ConvertSigned[int16]
+	case r.Int32:
+		ifc = ConvertSigned[int32]
+	case r.Int64:
+		ifc = ConvertSigned[int64]
+	case r.Uint8:
+		ifc = ConvertUnsigned[uint8]
+	case r.Uint16:
+		ifc = ConvertUnsigned[uint16]
+	case r.Uint32:
+		ifc = ConvertUnsigned[uint32]
+	case r.Uint64:
+		ifc = ConvertUnsigned[uint64]
+	}
+
+	if fn, ok := ifc.(func(r *ByteReader) (T, uint, error)); ok {
+		return fn
+	}
+
+	return nil
 }

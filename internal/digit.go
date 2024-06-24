@@ -14,10 +14,6 @@ type SignedNumber interface {
 	constraints.Float | constraints.Signed
 }
 
-type SliceItem interface {
-	bool | Number
-}
-
 func ProcessDigit[T constraints.Integer](digit uint, flags uint, res T) (T, uint) {
 	return res*T(10) + T(digit), flags | HasValue
 }
