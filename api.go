@@ -13,22 +13,22 @@ const (
 type ByteReader = ite.ByteReader
 
 func Read1D[T any](
-	r io.Reader, chunkSize int, conv func(*ByteReader) (T, error)) ([]T, error) {
+	r io.Reader, chunkSize int, conv func(*ByteReader) (T, uint, error)) ([]T, error) {
 
 	reader, err := ite.RunSliceReader(r, chunkSize, conv, 1)
 	return reader.Buf1, err
 }
 
 func Read2D[T any](
-	r io.Reader, chunkSize int, conv func(*ByteReader) (T, error)) ([][]T, error) {
+	r io.Reader, chunkSize int, conv func(*ByteReader) (T, uint, error)) ([][]T, error) {
 
-	reader, err := ite.RunSliceReader(r, chunkSize, conv, 1)
+	reader, err := ite.RunSliceReader(r, chunkSize, conv, 2)
 	return reader.Buf2, err
 }
 
 func Read3D[T any](
-	r io.Reader, chunkSize int, conv func(*ByteReader) (T, error)) ([][][]T, error) {
+	r io.Reader, chunkSize int, conv func(*ByteReader) (T, uint, error)) ([][][]T, error) {
 
-	reader, err := ite.RunSliceReader(r, chunkSize, conv, 1)
+	reader, err := ite.RunSliceReader(r, chunkSize, conv, 3)
 	return reader.Buf3, err
 }

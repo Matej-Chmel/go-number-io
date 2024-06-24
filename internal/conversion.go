@@ -1,7 +1,7 @@
 package internal
 
 import (
-	"io"
+	"errors"
 
 	"golang.org/x/exp/constraints"
 )
@@ -10,28 +10,85 @@ type Number interface {
 	constraints.Float | constraints.Integer
 }
 
-func ProcessDigit[T Number](digit uint, res T, hasDigits bool) (T, bool, error) {
-	if digit == WhiteSpace {
-		if !hasDigits {
-			return res, hasDigits, nil
-		}
-
-		return res, hasDigits, ErrBreak
-	}
-
-	return res*10 + T(digit), true, nil
+type SignedNumber interface {
+	constraints.Float | constraints.Signed
 }
 
-func ProcessError[T Number](err error, res T, hasDigits bool) (T, error) {
-	if hasDigits {
-		if err == ErrNewLine {
-			return res, ErrNewLineValue
+type SliceItem interface {
+	bool | Number
+}
+
+func ProcessDigit[T constraints.Integer](digit uint, flags uint, res T) (T, uint) {
+	return res*T(10) + T(digit), flags | HasValue
+}
+
+func ProcessFloatNonDigit[T constraints.Float](digit uint, flags uint, res T) (uint, error) {
+	if digit == DecimalDot {
+		if (flags & HasDecimals) == HasDecimals {
+			return 0, errors.New("Two decimal dots")
 		}
 
-		if err == io.EOF {
-			return res, ErrEOFValue
-		}
+		return flags | HasDecimals | HasValue, nil
 	}
 
-	return 0, err
+	return ProcessSignedNonDigit(digit, flags, res)
+}
+
+func ProcessIntNonDigit[T constraints.Signed](digit uint, flags uint, res T) (uint, error) {
+	if digit == DecimalDot {
+		return 0, errors.New("Decimal dot in signed integer")
+	}
+
+	return ProcessSignedNonDigit(digit, flags, res)
+}
+
+func ProcessNonDigit[T Number](digit uint, flags uint, res T) (uint, error) {
+	if digit == Newline {
+		return flags | HasNewline | Break, nil
+	}
+
+	if digit == WhiteSpace {
+		if (flags & HasValue) == 0 {
+			return flags, nil
+		}
+
+		return flags | Break, nil
+	}
+
+	if digit == 0 &&
+		res == T(0) &&
+		(flags&HasValue) == HasValue &&
+		(flags&HasDecimals) == 0 {
+		return 0, errors.New("Bad leading sequence")
+	}
+
+	return flags, nil
+}
+
+func ProcessSignedNonDigit[T SignedNumber](digit uint, flags uint, res T) (uint, error) {
+	if digit == MinusSign {
+		if (flags & IsNegative) == IsNegative {
+			return 0, errors.New("Double negative integer")
+		}
+
+		if (flags & HasValue) == HasValue {
+			return 0, errors.New("Minus sign after digit or dot")
+		}
+
+		return flags | HasValue | IsNegative, nil
+	}
+
+	return ProcessNonDigit(digit, flags, res)
+}
+
+func ProcessUintNonDigit[T constraints.Unsigned](digit uint, flags uint, res T) (uint, error) {
+	if digit == DecimalDot {
+		return 0, errors.New("Decimal dot in unsigned integer")
+	}
+
+	if digit == MinusSign {
+		return 0, errors.New("Negative sign in unsigned integer")
+	}
+
+	return ProcessNonDigit(digit, flags, res)
 }

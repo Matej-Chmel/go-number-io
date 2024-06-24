@@ -1,154 +1,108 @@
 package gonumberio
 
 import (
+	"fmt"
+
 	ite "github.com/Matej-Chmel/go-number-io/internal"
 
 	"golang.org/x/exp/constraints"
 )
 
-func ConvertBool(r *ByteReader) (bool, error) {
+func ConvertBool(r *ByteReader) (bool, uint, error) {
 	for {
 		b, err := r.NextDataByte()
 
 		if err != nil {
-			return false, err
+			return false, 0, err
+		}
+
+		if b == '\n' {
+			return false, ite.HasNewline, nil
 		}
 
 		if b == '0' {
-			return false, nil
+			return false, ite.HasValue, nil
 		} else if b == '1' {
-			return true, nil
+			return true, ite.HasValue, nil
+		} else if b == '\t' || b == ' ' {
+			continue
+		} else {
+			return false, 0, fmt.Errorf("Unknown bool symbol %c", b)
 		}
 	}
 }
 
-func ConvertByte(r *ByteReader) (byte, error) {
-	return r.NextByte()
+func ConvertByte(r *ByteReader) (byte, uint, error) {
+	b, err := r.NextByte()
+	return b, ite.HasValue, err
 }
 
-func ConvertFloat[T constraints.Float](r *ByteReader) (T, error) {
-	add, mult, res := T(1.0), T(10.0), T(0.0)
-	hasDigits, isNegative := false, false
+func convertSignedTemplate[T ite.SignedNumber](r *ByteReader,
+	processNonDigit func(uint, uint, T) (uint, error),
+	processDigit func(uint, uint, T) (T, uint),
+) (T, uint, error) {
+	res, flags, err := convertTemplate(r, processNonDigit, processDigit)
+
+	if (flags & ite.IsNegative) == ite.IsNegative {
+		res *= T(-1)
+	}
+
+	return res, flags, err
+}
+
+func convertTemplate[T ite.Number](
+	r *ByteReader,
+	processNonDigit func(uint, uint, T) (uint, error),
+	processDigit func(uint, uint, T) (T, uint),
+) (T, uint, error) {
+	var digit uint = 0
+	var err error = nil
+	var flags uint = 0
+	res := T(0)
 
 	for {
-		digit, err := r.NextDigit()
+		digit, err = r.NextDigit()
 
 		if err != nil {
-			return ite.ProcessError(err, res, hasDigits)
-		}
-
-		if digit == ite.MinusSign {
-			if isNegative {
-				return 0, ite.NewCustomError(
-					ite.CodeBadFormat, "Double negative float")
-			}
-
-			isNegative = true
-			continue
-		}
-
-		if digit == ite.DecimalDot {
-			if mult < 0 {
-				return 0.0, ite.NewCustomError(
-					ite.CodeBadFormat, "Double decimal dot")
-			}
-
-			add, hasDigits, mult = 0.1, true, 1/mult
-			continue
-		}
-
-		if digit == ite.WhiteSpace {
-			if !hasDigits {
-				continue
-			}
-
 			break
 		}
 
-		if digit == 0 && res == 0.0 && hasDigits {
-			return 0.0, ite.NewCustomError(
-				ite.CodeBadFormat, "Double leading zero")
+		flags, err = processNonDigit(digit, flags, res)
+
+		if err != nil || (flags&ite.Break) == ite.Break {
+			break
 		}
 
-		res += add * T(digit)
-		add *= mult
-		hasDigits = true
-	}
-
-	if isNegative {
-		res *= -1.0
-	}
-
-	return res, nil
-}
-
-func ConvertSigned[T constraints.Signed](r *ByteReader) (T, error) {
-	hasDigits, isNegative := false, false
-	var res T = 0
-
-	for {
-		digit, err := r.NextDigit()
-
-		if err != nil {
-			return ite.ProcessError(err, res, hasDigits)
-		}
-
-		if digit == ite.MinusSign {
-			if isNegative {
-				return 0, ite.NewCustomError(
-					ite.CodeBadFormat, "Double negative signed")
-			}
-
-			isNegative = true
+		if digit >= ite.DecimalDot {
 			continue
 		}
 
-		if digit == ite.DecimalDot {
-			return 0, ite.NewCustomError(
-				ite.CodeBadFormat, "Decimal dot in signed integer")
-		}
-
-		res, hasDigits, err = ite.ProcessDigit(digit, res, hasDigits)
-
-		if err == ite.ErrBreak {
-			break
-		}
+		res, flags = processDigit(digit, flags, res)
 	}
 
-	if isNegative {
-		res *= -1
-	}
-
-	return res, nil
+	return res, flags, err
 }
 
-func ConvertUnsigned[T constraints.Unsigned](r *ByteReader) (T, error) {
-	hasDigits := false
-	var res T = 0
-
-	for {
-		digit, err := r.NextDigit()
-
-		if err != nil {
-			return ite.ProcessError(err, res, hasDigits)
+func ConvertFloat[T constraints.Float](r *ByteReader) (T, uint, error) {
+	decMult := T(.1)
+	processDigit := func(digit uint, flags uint, res T) (T, uint) {
+		if (flags & ite.HasDecimals) == ite.HasDecimals {
+			res += decMult * T(digit)
+			decMult *= T(.1)
+		} else {
+			res = res*T(10.) + T(digit)
 		}
 
-		if digit == ite.MinusSign {
-			return 0, ite.NewCustomError(
-				ite.CodeBadFormat, "Negative sign in unsigned integer")
-		}
-
-		if digit == ite.DecimalDot {
-			return 0, ite.NewCustomError(
-				ite.CodeBadFormat, "Decimal dot in unsigned integer")
-		}
-
-		res, hasDigits, err = ite.ProcessDigit(digit, res, hasDigits)
-
-		if err == ite.ErrBreak {
-			break
-		}
+		return res, flags | ite.HasValue
 	}
 
-	return res, nil
+	return convertSignedTemplate(r, ite.ProcessFloatNonDigit, processDigit)
+}
+
+func ConvertSigned[T constraints.Signed](r *ByteReader) (T, uint, error) {
+	return convertSignedTemplate[T](r, ite.ProcessIntNonDigit, ite.ProcessDigit)
+}
+
+func ConvertUnsigned[T constraints.Unsigned](r *ByteReader) (T, uint, error) {
+	return convertTemplate[T](r, ite.ProcessUintNonDigit, ite.ProcessDigit)
 }

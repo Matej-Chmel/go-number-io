@@ -7,13 +7,13 @@ type SliceReader[T any] struct {
 	Buf2        [][]T
 	Buf3        [][][]T
 	byteReader  *ByteReader
-	conv        func(*ByteReader) (T, error)
+	conv        func(*ByteReader) (T, uint, error)
 	dim         uint
-	prevNewLine bool
+	prevNewline bool
 }
 
 func NewSliceReader[T any](
-	byteReader *ByteReader, conv func(*ByteReader) (T, error), dim uint,
+	byteReader *ByteReader, conv func(*ByteReader) (T, uint, error), dim uint,
 ) *SliceReader[T] {
 	res := &SliceReader[T]{
 		Buf1:        make([]T, 0),
@@ -22,7 +22,7 @@ func NewSliceReader[T any](
 		byteReader:  byteReader,
 		conv:        conv,
 		dim:         dim,
-		prevNewLine: false,
+		prevNewline: false,
 	}
 
 	if dim >= 2 {
@@ -50,51 +50,54 @@ func (s *SliceReader[T]) add2Dto3D() {
 	}
 }
 
-func (s *SliceReader[T]) processNewLine() {
-	if s.dim <= 1 {
-		return
-	} else if s.dim == 2 {
+func (s *SliceReader[T]) processNewline() {
+	if s.dim == 2 {
 		s.add1Dto2D()
-	} else if s.prevNewLine {
-		s.add2Dto3D()
-		s.prevNewLine = false
-	} else {
-		s.prevNewLine = true
+		return
 	}
+
+	if s.dim != 3 {
+		return
+	}
+
+	if s.prevNewline {
+		s.add2Dto3D()
+	} else {
+		s.add1Dto2D()
+	}
+
+	s.prevNewline = !s.prevNewline
 }
 
 func (s *SliceReader[T]) Run() error {
 	for {
-		val, err := s.conv(s.byteReader)
+		val, flags, err := s.conv(s.byteReader)
+
+		if (flags & HasValue) == HasValue {
+			s.Buf1 = append(s.Buf1, val)
+			s.prevNewline = false
+		}
 
 		if err != nil {
-			if err == ErrNewLine {
-				s.processNewLine()
-				continue
-			}
-
-			if err == ErrNewLineValue {
-				s.Buf1 = append(s.Buf1, val)
-				s.processNewLine()
-				continue
-			}
-
 			if err == io.EOF {
 				break
 			}
 
-			if err == ErrEOFValue {
-				s.Buf1 = append(s.Buf1, val)
-				break
-			}
-
-			s.Buf1 = nil
-			s.Buf2 = nil
-			s.Buf3 = nil
+			s.Buf1, s.Buf2, s.Buf3 = nil, nil, nil
 			return err
 		}
 
-		s.Buf1 = append(s.Buf1, val)
+		if (flags & HasNewline) == HasNewline {
+			s.processNewline()
+		}
+	}
+
+	if s.dim >= 2 {
+		s.add1Dto2D()
+	}
+
+	if s.dim == 3 {
+		s.add2Dto3D()
 	}
 
 	return nil
@@ -102,7 +105,7 @@ func (s *SliceReader[T]) Run() error {
 
 func RunSliceReader[T any](
 	r io.Reader, chunkSize int,
-	conv func(*ByteReader) (T, error), dim uint) (*SliceReader[T], error) {
+	conv func(*ByteReader) (T, uint, error), dim uint) (*SliceReader[T], error) {
 
 	byteReader := NewByteReader(r, chunkSize)
 	sliceReader := NewSliceReader(byteReader, conv, dim)

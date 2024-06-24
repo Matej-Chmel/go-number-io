@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"fmt"
 	"io"
 )
 
@@ -48,12 +49,12 @@ func (r *ByteReader) NextDataByte() (byte, error) {
 		if nb, err := r.NextByte(); err != nil {
 			return 0, err
 		} else if nb == '\n' {
-			return 0, ErrNewLine
+			return '\n', nil
 		}
 
 		r.index--
 	} else if b == '\n' {
-		return 0, ErrNewLine
+		return '\n', nil
 	}
 
 	return b, nil
@@ -63,18 +64,28 @@ func (r *ByteReader) NextDigit() (uint, error) {
 	b, err := r.NextDataByte()
 
 	if err != nil {
-		return 0, err
+		return ErrDigit, err
 	}
 
 	if b >= '0' && b <= '9' {
 		return uint(b - '0'), nil
-	} else if b == '-' {
+	}
+
+	if b == '-' {
 		return MinusSign, nil
-	} else if b == '.' {
+	}
+
+	if b == '.' {
 		return DecimalDot, nil
-	} else if b == ' ' || b == '\t' || b == '\r' {
+	}
+
+	if b == '\n' {
+		return Newline, nil
+	}
+
+	if b == ' ' || b == '\t' || b == '\r' {
 		return WhiteSpace, nil
 	}
 
-	return 0, NewCustomError(CodeLetter, "Letter %c in number", b)
+	return ErrDigit, fmt.Errorf("Letter %c in number", b)
 }
