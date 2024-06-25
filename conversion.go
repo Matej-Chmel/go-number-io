@@ -72,6 +72,8 @@ func GetConversion[T any]() func(r *ByteReader) (T, uint, error) {
 		ifc = ConvertFloat[float32]
 	case r.Float64:
 		ifc = ConvertFloat[float64]
+	case r.Int:
+		ifc = ConvertSigned[int]
 	case r.Int8:
 		ifc = ConvertSigned[int8]
 	case r.Int16:
@@ -80,6 +82,8 @@ func GetConversion[T any]() func(r *ByteReader) (T, uint, error) {
 		ifc = ConvertSigned[int32]
 	case r.Int64:
 		ifc = ConvertSigned[int64]
+	case r.Uint:
+		ifc = ConvertUnsigned[uint]
 	case r.Uint8:
 		ifc = ConvertUnsigned[uint8]
 	case r.Uint16:

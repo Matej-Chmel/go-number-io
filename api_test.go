@@ -16,16 +16,16 @@ const (
 )
 
 var (
-	bool1D = []bool{false, true, false, false, true}
+	boolD1 = []bool{false, true, false, false, true}
 
-	bool2D = [][]bool{
+	boolD2 = [][]bool{
 		{false, true},
 		{true},
 		{false, false, false, false, false, false},
 		{true, true},
 	}
 
-	bool3D = [][][]bool{
+	boolD3 = [][][]bool{
 		{
 			{true},
 			{false, false, false, false, false, false},
@@ -45,15 +45,15 @@ var (
 		},
 	}
 
-	float1D = []float32{1.12, 3.45, -3.90, .23, -.23, .201, 0, 0, 0}
+	floatD1 = []float32{1.12, 3.45, -3.9, .23, -.23, .201, 0., 0., 0.}
 
-	float2D = [][]float32{
+	floatD2 = [][]float32{
 		{3.4, 5.6, -201.2},
 		{1.1, .231, -23.},
 		{90.001, 9000.1, -01000.1},
 	}
 
-	float3D = [][][]float32{
+	floatD3 = [][][]float32{
 		{
 			{1, 1, 1},
 			{1.1, 1.1, 1.1},
@@ -71,16 +71,16 @@ var (
 		},
 	}
 
-	int1D = []int32{1, -2, 3, -4, 5, 0}
+	int32D1 = []int32{1, -2, 3, -4, 5, 0}
 
-	int2D = [][]int32{
+	int32D2 = [][]int32{
 		{1, 2, -3},
 		{4, -5, 6},
 		{-7, -8, -9},
 		{0, 0},
 	}
 
-	int3D = [][][]int32{
+	int32D3 = [][][]int32{
 		{
 			{-1, 2, 3},
 			{0, 0, 0},
@@ -102,16 +102,78 @@ var (
 		},
 	}
 
-	uint1D = []uint32{1, 2, 3, 4, 5}
+	int1D = []int{1, -2, 3, -4, 5, 0}
 
-	uint2D = [][]uint32{
+	int2D = [][]int{
+		{1, 2, -3},
+		{4, -5, 6},
+		{-7, -8, -9},
+		{0, 0},
+	}
+
+	int3D = [][][]int{
+		{
+			{-1, 2, 3},
+			{0, 0, 0},
+		},
+		{
+			{-1, -2, -3},
+			{-4, -5, -6},
+			{7, 8, 9},
+		},
+		{
+			{0},
+		},
+		{
+			{100, 10000},
+			{-20132, -2121},
+			{-3000, 10300, 12001, 14001},
+			{9091, 8091, 17003},
+			{90123},
+		},
+	}
+
+	uint32D1 = []uint32{1, 2, 3, 4, 5}
+
+	uint32D2 = [][]uint32{
 		{9, 0, 90},
 		{89, 78},
 		{102, 0, 0, 0, 3022, 19283},
 		{18293},
 	}
 
-	uint3D = [][][]uint32{
+	uint32D3 = [][][]uint32{
+		{
+			{0, 1, 2, 3, 4},
+			{5, 6, 7, 7},
+			{7, 9, 0, 8},
+			{8, 7, 7},
+			{1},
+		},
+		{
+			{1, 2, 3},
+			{4, 5},
+			{6},
+		},
+		{
+			{8, 9},
+			{0, 0, 1},
+			{2, 3, 4, 5},
+			{10, 11, 12, 13},
+			{14},
+		},
+	}
+
+	uintD1 = []uint{1, 2, 3, 4, 5}
+
+	uintD2 = [][]uint{
+		{9, 0, 90},
+		{89, 78},
+		{102, 0, 0, 0, 3022, 19283},
+		{18293},
+	}
+
+	uintD3 = [][][]uint{
 		{
 			{0, 1, 2, 3, 4},
 			{5, 6, 7, 7},
@@ -227,13 +289,17 @@ func getExpected[T SliceItem]() ([]T, [][]T, [][][]T) {
 
 	switch kind := ite.GetTypeKind[T](); kind {
 	case r.Bool:
-		i1D, i2D, i3D = bool1D, bool2D, bool3D
+		i1D, i2D, i3D = boolD1, boolD2, boolD3
 	case r.Float32:
-		i1D, i2D, i3D = float1D, float2D, float3D
-	case r.Int32:
+		i1D, i2D, i3D = floatD1, floatD2, floatD3
+	case r.Int:
 		i1D, i2D, i3D = int1D, int2D, int3D
+	case r.Int32:
+		i1D, i2D, i3D = int32D1, int32D2, int32D3
+	case r.Uint:
+		i1D, i2D, i3D = uintD1, uintD2, uintD3
 	case r.Uint32:
-		i1D, i2D, i3D = uint1D, uint2D, uint3D
+		i1D, i2D, i3D = uint32D1, uint32D2, uint32D3
 	}
 
 	r1D, _ := i1D.([]T)
@@ -254,7 +320,7 @@ func getTypeName[T SliceItem]() string {
 		return "int8"
 	case r.Int16:
 		return "int16"
-	case r.Int32:
+	case r.Int, r.Int32:
 		return "int"
 	case r.Int64:
 		return "int64"
@@ -262,7 +328,7 @@ func getTypeName[T SliceItem]() string {
 		return "uint8"
 	case r.Uint16:
 		return "uint16"
-	case r.Uint32:
+	case r.Uint, r.Uint32:
 		return "uint"
 	case r.Uint64:
 		return "uint64"
@@ -333,8 +399,16 @@ func TestFloat32(t *testing.T) {
 	runTest[float32](t)
 }
 
+func TestInt(t *testing.T) {
+	runTest[int](t)
+}
+
 func TestInt32(t *testing.T) {
 	runTest[int32](t)
+}
+
+func TestUint(t *testing.T) {
+	runTest[uint](t)
 }
 
 func TestUint32(t *testing.T) {

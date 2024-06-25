@@ -1,6 +1,9 @@
 package internal
 
-import "io"
+import (
+	"errors"
+	"io"
+)
 
 type SliceReader[T any] struct {
 	Buf1        []T
@@ -70,6 +73,10 @@ func (s *SliceReader[T]) processNewline() {
 }
 
 func (s *SliceReader[T]) Run() error {
+	if s.conv == nil {
+		return errors.New("Conversion function is nil")
+	}
+
 	for {
 		val, flags, err := s.conv(s.byteReader)
 
