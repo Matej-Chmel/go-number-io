@@ -2,6 +2,7 @@ package gonumberio_test
 
 import (
 	"fmt"
+	"io"
 	"math"
 	"os"
 	r "reflect"
@@ -102,16 +103,16 @@ var (
 		},
 	}
 
-	int1D = []int{1, -2, 3, -4, 5, 0}
+	intD1 = []int{1, -2, 3, -4, 5, 0}
 
-	int2D = [][]int{
+	intD2 = [][]int{
 		{1, 2, -3},
 		{4, -5, 6},
 		{-7, -8, -9},
 		{0, 0},
 	}
 
-	int3D = [][][]int{
+	intD3 = [][][]int{
 		{
 			{-1, 2, 3},
 			{0, 0, 0},
@@ -196,30 +197,6 @@ var (
 	}
 )
 
-func check1D[T SliceItem](err error, a, b []T, cmp func(T, T) bool, t *testing.T) {
-	if err != nil {
-		t.Error(err)
-	} else if !compare1D(a, b, cmp) {
-		throw(a, b, t)
-	}
-}
-
-func check2D[T SliceItem](err error, a, b [][]T, cmp func(T, T) bool, t *testing.T) {
-	if err != nil {
-		t.Error(err)
-	} else if !compare2D(a, b, cmp) {
-		throw(a, b, t)
-	}
-}
-
-func check3D[T SliceItem](err error, a, b [][][]T, cmp func(T, T) bool, t *testing.T) {
-	if err != nil {
-		t.Error(err)
-	} else if !compare3D(a, b, cmp) {
-		throw(a, b, t)
-	}
-}
-
 func compare1D[T SliceItem](a1, b1 []T, cmp func(T, T) bool) bool {
 	if len(a1) != len(b1) {
 		return false
@@ -271,7 +248,7 @@ func equals[T SliceItem](a, b T) bool {
 	return a == b
 }
 
-func getEpsilonCmp[T any]() interface{} {
+func getEpsilonCmp[T SliceItem]() interface{} {
 	switch kind := ite.GetTypeKind[T](); kind {
 	case r.Float32:
 		return epsilonCompare[float32]
@@ -282,30 +259,70 @@ func getEpsilonCmp[T any]() interface{} {
 	return nil
 }
 
-func getExpected[T SliceItem]() ([]T, [][]T, [][][]T) {
-	var i1D interface{}
-	var i2D interface{}
-	var i3D interface{}
+func getExpected1D[T SliceItem]() []T {
+	var ifc interface{}
 
 	switch kind := ite.GetTypeKind[T](); kind {
 	case r.Bool:
-		i1D, i2D, i3D = boolD1, boolD2, boolD3
+		ifc = boolD1
 	case r.Float32:
-		i1D, i2D, i3D = floatD1, floatD2, floatD3
+		ifc = floatD1
 	case r.Int:
-		i1D, i2D, i3D = int1D, int2D, int3D
+		ifc = intD1
 	case r.Int32:
-		i1D, i2D, i3D = int32D1, int32D2, int32D3
+		ifc = int32D1
 	case r.Uint:
-		i1D, i2D, i3D = uintD1, uintD2, uintD3
+		ifc = uintD1
 	case r.Uint32:
-		i1D, i2D, i3D = uint32D1, uint32D2, uint32D3
+		ifc = uint32D1
 	}
 
-	r1D, _ := i1D.([]T)
-	r2D, _ := i2D.([][]T)
-	r3D, _ := i3D.([][][]T)
-	return r1D, r2D, r3D
+	res, _ := ifc.([]T)
+	return res
+}
+
+func getExpected2D[T SliceItem]() [][]T {
+	var ifc interface{}
+
+	switch kind := ite.GetTypeKind[T](); kind {
+	case r.Bool:
+		ifc = boolD2
+	case r.Float32:
+		ifc = floatD2
+	case r.Int:
+		ifc = intD2
+	case r.Int32:
+		ifc = int32D2
+	case r.Uint:
+		ifc = uintD2
+	case r.Uint32:
+		ifc = uint32D2
+	}
+
+	res, _ := ifc.([][]T)
+	return res
+}
+
+func getExpected3D[T SliceItem]() [][][]T {
+	var ifc interface{}
+
+	switch kind := ite.GetTypeKind[T](); kind {
+	case r.Bool:
+		ifc = boolD3
+	case r.Float32:
+		ifc = floatD3
+	case r.Int:
+		ifc = intD3
+	case r.Int32:
+		ifc = int32D3
+	case r.Uint:
+		ifc = uintD3
+	case r.Uint32:
+		ifc = uint32D3
+	}
+
+	res, _ := ifc.([][][]T)
+	return res
 }
 
 func getTypeName[T SliceItem]() string {
@@ -337,42 +354,28 @@ func getTypeName[T SliceItem]() string {
 	return "unknown"
 }
 
-type file struct {
-	*os.File
-	error
-}
-
-func openFile(dim uint, typeName string) file {
-	filePath := fmt.Sprintf("data/%s/%dD.txt", typeName, dim)
-	data, err := os.Open(filePath)
-	return file{File: data, error: err}
-}
-
-func openFiles[T SliceItem]() (res [3]file) {
-	typeName := getTypeName[T]()
-	res[0] = openFile(1, typeName)
-	res[1] = openFile(2, typeName)
-	res[2] = openFile(3, typeName)
-	return
+func openFile[T SliceItem](dim uint) (*os.File, error) {
+	filePath := fmt.Sprintf("data/%s/%dD.txt", getTypeName[T](), dim)
+	return os.Open(filePath)
 }
 
 type SliceItem interface {
 	bool | ite.Number
 }
 
-func throw[T any](a, b T, t *testing.T) {
-	t.Errorf("\n\n%v\n\n!=\n\n%v", a, b)
+type tester[T SliceItem] struct {
+	cmp       func(T, T) bool
+	dim       uint
+	file      *os.File
+	isDynamic bool
+	t         *testing.T
 }
 
-func runTest[T SliceItem](t *testing.T) {
-	e1D, e2D, e3D := getExpected[T]()
-	files := openFiles[T]()
-
-	defer func() {
-		for _, v := range files {
-			v.Close()
-		}
-	}()
+func newTester[T SliceItem](dim uint, isDynamic bool, t *testing.T) (tester[T], error) {
+	if dim < 1 || dim > 3 {
+		var res tester[T]
+		return res, fmt.Errorf("%dD slices not supported", dim)
+	}
 
 	var cmp func(T, T) bool = equals[T]
 	eps, ok := getEpsilonCmp[T]().(func(T, T) bool)
@@ -381,36 +384,122 @@ func runTest[T SliceItem](t *testing.T) {
 		cmp = eps
 	}
 
-	a1D, err := nio.Read1D[T](files[0])
-	check1D(err, a1D, e1D, cmp, t)
+	file, err := openFile[T](dim)
 
-	a2D, err := nio.Read2D[T](files[1])
-	check2D(err, a2D, e2D, cmp, t)
+	if err != nil {
+		var res tester[T]
+		return res, err
+	}
 
-	a3D, err := nio.Read3D[T](files[2])
-	check3D(err, a3D, e3D, cmp, t)
+	return tester[T]{
+		cmp:       cmp,
+		dim:       dim,
+		file:      file,
+		isDynamic: isDynamic,
+		t:         t,
+	}, nil
+}
+
+func (t *tester[T]) check1D(getActual func(io.Reader) ([]T, error)) {
+	if actual, err := getActual(t.file); err != nil {
+		t.throwError(err)
+	} else if expected := getExpected1D[T](); !compare1D(actual, expected, t.cmp) {
+		t.throwNotEqual(actual, expected)
+	}
+}
+
+func (t *tester[T]) check2D(getActual func(io.Reader) ([][]T, error)) {
+	if actual, err := getActual(t.file); err != nil {
+		t.throwError(err)
+	} else if expected := getExpected2D[T](); !compare2D(actual, expected, t.cmp) {
+		t.throwNotEqual(actual, expected)
+	}
+}
+
+func (t *tester[T]) check3D(getActual func(io.Reader) ([][][]T, error)) {
+	if actual, err := getActual(t.file); err != nil {
+		t.throwError(err)
+	} else if expected := getExpected3D[T](); !compare3D(actual, expected, t.cmp) {
+		t.throwNotEqual(actual, expected)
+	}
+}
+
+func (t *tester[T]) logDynamic() {
+	t.t.Logf("Is dynamic: %t", t.isDynamic)
+}
+
+func (t *tester[T]) runTest() {
+	if t.isDynamic {
+		if t.dim == 1 {
+			t.check1D(nio.Read[[]T])
+		} else if t.dim == 2 {
+			t.check2D(nio.Read[[][]T])
+		} else if t.dim == 3 {
+			t.check3D(nio.Read[[][][]T])
+		}
+	} else {
+		if t.dim == 1 {
+			t.check1D(nio.Read1D[T])
+		} else if t.dim == 2 {
+			t.check2D(nio.Read2D[T])
+		} else if t.dim == 3 {
+			t.check3D(nio.Read3D[T])
+		}
+	}
+
+	t.file.Close()
+}
+
+func (t *tester[T]) throwError(err error) {
+	t.logDynamic()
+	t.t.Error(err)
+}
+
+func (t *tester[T]) throwNotEqual(a, b interface{}) {
+	t.logDynamic()
+	t.t.Errorf("\n\n%v\n\n!=\n\n%v", a, b)
+}
+
+func runAllTests[T SliceItem](t *testing.T) {
+	runTest[T](1, false, t)
+	runTest[T](1, true, t)
+	runTest[T](2, false, t)
+	runTest[T](2, true, t)
+	runTest[T](3, false, t)
+	runTest[T](3, true, t)
+}
+
+func runTest[T SliceItem](dim uint, isDynamic bool, t *testing.T) {
+	tr, err := newTester[T](dim, isDynamic, t)
+
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	tr.runTest()
 }
 
 func TestBool(t *testing.T) {
-	runTest[bool](t)
+	runAllTests[bool](t)
 }
 
 func TestFloat32(t *testing.T) {
-	runTest[float32](t)
+	runAllTests[float32](t)
 }
 
 func TestInt(t *testing.T) {
-	runTest[int](t)
+	runAllTests[int](t)
 }
 
 func TestInt32(t *testing.T) {
-	runTest[int32](t)
+	runAllTests[int32](t)
 }
 
 func TestUint(t *testing.T) {
-	runTest[uint](t)
+	runAllTests[uint](t)
 }
 
 func TestUint32(t *testing.T) {
-	runTest[uint32](t)
+	runAllTests[uint32](t)
 }

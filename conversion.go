@@ -63,39 +63,43 @@ func ConvertUnsigned[T constraints.Unsigned](r *ByteReader) (T, uint, error) {
 }
 
 func GetConversion[T any]() func(r *ByteReader) (T, uint, error) {
-	var ifc interface{}
-
-	switch kind := ite.GetTypeKind[T](); kind {
-	case r.Bool:
-		ifc = ConvertBool
-	case r.Float32:
-		ifc = ConvertFloat[float32]
-	case r.Float64:
-		ifc = ConvertFloat[float64]
-	case r.Int:
-		ifc = ConvertSigned[int]
-	case r.Int8:
-		ifc = ConvertSigned[int8]
-	case r.Int16:
-		ifc = ConvertSigned[int16]
-	case r.Int32:
-		ifc = ConvertSigned[int32]
-	case r.Int64:
-		ifc = ConvertSigned[int64]
-	case r.Uint:
-		ifc = ConvertUnsigned[uint]
-	case r.Uint8:
-		ifc = ConvertUnsigned[uint8]
-	case r.Uint16:
-		ifc = ConvertUnsigned[uint16]
-	case r.Uint32:
-		ifc = ConvertUnsigned[uint32]
-	case r.Uint64:
-		ifc = ConvertUnsigned[uint64]
-	}
+	ifc := getConversionImpl(ite.GetType[T]())
 
 	if fn, ok := ifc.(func(r *ByteReader) (T, uint, error)); ok {
 		return fn
+	}
+
+	return nil
+}
+
+func getConversionImpl(t r.Type) interface{} {
+	switch kind := t.Kind(); kind {
+	case r.Bool:
+		return ConvertBool
+	case r.Float32:
+		return ConvertFloat[float32]
+	case r.Float64:
+		return ConvertFloat[float64]
+	case r.Int:
+		return ConvertSigned[int]
+	case r.Int8:
+		return ConvertSigned[int8]
+	case r.Int16:
+		return ConvertSigned[int16]
+	case r.Int32:
+		return ConvertSigned[int32]
+	case r.Int64:
+		return ConvertSigned[int64]
+	case r.Uint:
+		return ConvertUnsigned[uint]
+	case r.Uint8:
+		return ConvertUnsigned[uint8]
+	case r.Uint16:
+		return ConvertUnsigned[uint16]
+	case r.Uint32:
+		return ConvertUnsigned[uint32]
+	case r.Uint64:
+		return ConvertUnsigned[uint64]
 	}
 
 	return nil
