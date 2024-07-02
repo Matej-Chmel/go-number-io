@@ -5,6 +5,9 @@ import (
 	"io"
 )
 
+// Reads 1D, 2D or 3D slice of T from the specified ByteReader.
+// For each element of type T, a conversion function conv
+// is used to construct it from the current position of ByteReader.
 type SliceReader[T any] struct {
 	Buf1        []T
 	Buf2        [][]T
@@ -15,6 +18,7 @@ type SliceReader[T any] struct {
 	prevNewline bool
 }
 
+// Constructs new SliceReader
 func NewSliceReader[T any](
 	byteReader *ByteReader, conv func(*ByteReader) (T, uint, error), dim uint,
 ) *SliceReader[T] {
@@ -39,6 +43,7 @@ func NewSliceReader[T any](
 	return res
 }
 
+// Adds a 1D slice to a 2D slice if available
 func (s *SliceReader[T]) add1Dto2D() {
 	if len(s.Buf1) > 0 {
 		s.Buf2 = append(s.Buf2, s.Buf1)
@@ -46,6 +51,7 @@ func (s *SliceReader[T]) add1Dto2D() {
 	}
 }
 
+// Adds a 2D slice to a 3D slice if available
 func (s *SliceReader[T]) add2Dto3D() {
 	if len(s.Buf2) > 0 {
 		s.Buf3 = append(s.Buf3, s.Buf2)
@@ -53,6 +59,9 @@ func (s *SliceReader[T]) add2Dto3D() {
 	}
 }
 
+// Processes newline symbol.
+// Two newlines in a row signalize that a 2D slice
+// is ready to be added to a 3D slice.
 func (s *SliceReader[T]) processNewline() {
 	if s.dim == 2 {
 		s.add1Dto2D()
@@ -72,6 +81,8 @@ func (s *SliceReader[T]) processNewline() {
 	s.prevNewline = !s.prevNewline
 }
 
+// Converts all bytes from ByteReader to the specified slice
+// of dimension s.dim
 func (s *SliceReader[T]) Run() error {
 	if s.conv == nil {
 		return errors.New("Conversion function is nil")
@@ -110,6 +121,7 @@ func (s *SliceReader[T]) Run() error {
 	return nil
 }
 
+// Constructs and runs a SliceReader
 func RunSliceReader[T any](
 	r io.Reader, chunkSize int,
 	conv func(*ByteReader) (T, uint, error), dim uint) (*SliceReader[T], error) {

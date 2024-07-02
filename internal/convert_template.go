@@ -1,5 +1,6 @@
 package internal
 
+// Template function for converting floats and integers
 func ConvertSignedTemplate[T SignedNumber](r *ByteReader,
 	processNonDigit func(uint, uint, T) (uint, error),
 	processDigit func(uint, uint, T) (T, uint),
@@ -13,6 +14,7 @@ func ConvertSignedTemplate[T SignedNumber](r *ByteReader,
 	return res, flags, err
 }
 
+// Template function for converting all number types
 func ConvertTemplate[T Number](
 	r *ByteReader,
 	processNonDigit func(uint, uint, T) (uint, error),
@@ -25,6 +27,10 @@ func ConvertTemplate[T Number](
 
 	for {
 		digit, err = r.NextDigit()
+
+		if digit == Letter {
+			r.MoveBack()
+		}
 
 		if err != nil {
 			break

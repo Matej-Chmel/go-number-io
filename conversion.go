@@ -9,9 +9,10 @@ import (
 	"golang.org/x/exp/constraints"
 )
 
+// Conversion function for type bool
 func ConvertBool(r *ByteReader) (bool, uint, error) {
 	for {
-		b, err := r.NextDataByte()
+		b, err := r.NextByteConvertNewline()
 
 		if err != nil {
 			return false, 0, err
@@ -33,11 +34,13 @@ func ConvertBool(r *ByteReader) (bool, uint, error) {
 	}
 }
 
+// Conversion function for type byte
 func ConvertByte(r *ByteReader) (byte, uint, error) {
 	b, err := r.NextByte()
 	return b, ite.HasValue, err
 }
 
+// Conversion function for type float
 func ConvertFloat[T constraints.Float](r *ByteReader) (T, uint, error) {
 	decMult := T(.1)
 	processDigit := func(digit uint, flags uint, res T) (T, uint) {
@@ -54,25 +57,29 @@ func ConvertFloat[T constraints.Float](r *ByteReader) (T, uint, error) {
 	return ite.ConvertSignedTemplate(r, ite.ProcessFloatNonDigit, processDigit)
 }
 
+// Conversion function for floats and integers
 func ConvertSigned[T constraints.Signed](r *ByteReader) (T, uint, error) {
 	return ite.ConvertSignedTemplate[T](r, ite.ProcessIntNonDigit, ite.ProcessDigit)
 }
 
+// Conversion function for unsigned integers
 func ConvertUnsigned[T constraints.Unsigned](r *ByteReader) (T, uint, error) {
 	return ite.ConvertTemplate[T](r, ite.ProcessUintNonDigit, ite.ProcessDigit)
 }
 
+// Returns conversion function for generic type T
 func GetConversion[T any]() func(r *ByteReader) (T, uint, error) {
-	ifc := getConversionImpl(ite.GetType[T]())
+	a := getConversionImpl(ite.GetType[T]())
 
-	if fn, ok := ifc.(func(r *ByteReader) (T, uint, error)); ok {
+	if fn, ok := a.(func(r *ByteReader) (T, uint, error)); ok {
 		return fn
 	}
 
 	return nil
 }
 
-func getConversionImpl(t r.Type) interface{} {
+// Internal implementation of GetConversion[T]
+func getConversionImpl(t r.Type) any {
 	switch kind := t.Kind(); kind {
 	case r.Bool:
 		return ConvertBool

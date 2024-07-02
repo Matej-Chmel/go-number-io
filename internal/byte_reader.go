@@ -1,10 +1,8 @@
 package internal
 
-import (
-	"fmt"
-	"io"
-)
+import "io"
 
+// Buffered reader of bytes
 type ByteReader struct {
 	buf    []byte
 	bufLen int
@@ -12,6 +10,7 @@ type ByteReader struct {
 	index  int
 }
 
+// Constructs new ByteReader
 func NewByteReader(r io.Reader, chunkSize int) *ByteReader {
 	return &ByteReader{
 		buf:    make([]byte, chunkSize),
@@ -21,6 +20,33 @@ func NewByteReader(r io.Reader, chunkSize int) *ByteReader {
 	}
 }
 
+// Searches for byte b, if found moves back one character behind b
+func (r *ByteReader) LookAheadFor(b byte) (bool, error) {
+	for {
+		next, err := r.NextByteConvertNewline()
+
+		if err != nil {
+			return false, err
+		}
+
+		if next == '\n' {
+			return true, nil
+		}
+
+		if b == next {
+			r.MoveBack()
+			return false, nil
+		}
+	}
+}
+
+// Moves the head one place backwards
+func (r *ByteReader) MoveBack() {
+	r.index--
+}
+
+// Returns the next byte without any conversions.
+// If current buffer is exhausted, a new buffer is read.
 func (r *ByteReader) NextByte() (byte, error) {
 	if r.index >= r.bufLen {
 		var err error
@@ -38,7 +64,8 @@ func (r *ByteReader) NextByte() (byte, error) {
 	return res, nil
 }
 
-func (r *ByteReader) NextDataByte() (byte, error) {
+// Returns next byte and convert "\r\n" to "\n"
+func (r *ByteReader) NextByteConvertNewline() (byte, error) {
 	b, err := r.NextByte()
 
 	if err != nil {
@@ -52,7 +79,7 @@ func (r *ByteReader) NextDataByte() (byte, error) {
 			return '\n', nil
 		}
 
-		r.index--
+		r.MoveBack()
 	} else if b == '\n' {
 		return '\n', nil
 	}
@@ -60,8 +87,9 @@ func (r *ByteReader) NextDataByte() (byte, error) {
 	return b, nil
 }
 
+// Returns next number symbol as uint
 func (r *ByteReader) NextDigit() (uint, error) {
-	b, err := r.NextDataByte()
+	b, err := r.NextByteConvertNewline()
 
 	if err != nil {
 		return ErrDigit, err
@@ -87,5 +115,20 @@ func (r *ByteReader) NextDigit() (uint, error) {
 		return WhiteSpace, nil
 	}
 
-	return ErrDigit, fmt.Errorf("Letter %c in number", b)
+	return Letter, nil
+}
+
+// Skip the next byte b, if found
+func (r *ByteReader) SkipByte(b byte) error {
+	for {
+		next, err := r.NextByte()
+
+		if err != nil {
+			return err
+		}
+
+		if b == next {
+			return nil
+		}
+	}
 }
